@@ -1,13 +1,13 @@
 import React, { Component } from 'react'
 import Item from './Item'
 import CreateItem from './CreateItem'
-import { graphql, gql } from 'react-apollo'
+import { graphql, gql, compose } from 'react-apollo'
 
 class Queue extends Component {
 
   constructor() {
     super();
-    this.state = { items: [] };
+    this.state = { items: [], completedItems: []  };
   }
 
   setItems(items) {
@@ -20,11 +20,16 @@ class Queue extends Component {
       return <div>Loading</div>
     }
 
+    if (this.props.completedItemsQuery && this.props.completedItemsQuery.loading) {
+      return <div>Loading</div>
+    }
+
     if (this.props.allItemsQuery && this.props.allItemsQuery.error) {
       return <div>Error</div>
     }
 
     let items = this.props.allItemsQuery.allItems.slice(0).reverse()
+    let completedItems = this.props.completedItemsQuery.allItems.slice(0).reverse()
     return (
       <div>
         <CreateItem sendData={this.itemCreated}/>
@@ -35,19 +40,33 @@ class Queue extends Component {
               ))}
             </ul>
           </section>
+          <section>
+            <h3>Whats been acomplished?</h3>
+            <ul className="todo-list">
+                {completedItems.map(item => (
+                  <Item key={item.id} item={item}/>
+                ))}
+            </ul>
+          </section>
       </div>
     )
   }
 
   itemCreated = (item) => {
-    this.props.allItemsQuery.refetch()
+    this.props.allItemsQuery.refetch();
+    this.props.completedItemsQuery.refetch();
+  }
+
+  itemChanged = (item) => {
+    this.props.allItemsQuery.refetch();
+    this.props.completedItemsQuery.refetch();
   }
 
 }
 
-const ALL_ITEMS_QUERY = gql`
-  query allItemsQuery {
-    allItems {
+const NONCOMPLETED_ITEMS_QUERY = gql`
+  query nonCompletedItemsQuery {
+    allItems(filter: { completed: false }) {
       id
       createdAt
       description
@@ -56,4 +75,19 @@ const ALL_ITEMS_QUERY = gql`
   }
 `
 
-export default graphql(ALL_ITEMS_QUERY, { name: 'allItemsQuery' }) (Queue)
+const COMPLETED_ITEMS_QUERY = gql`
+  query completedItemsQuery {
+    allItems(filter: { completed: true }) {
+      id
+      createdAt
+      description
+      completed
+    }
+  }
+`
+
+export default compose (
+  graphql(COMPLETED_ITEMS_QUERY, { name: 'completedItemsQuery' }),
+  graphql(NONCOMPLETED_ITEMS_QUERY, { name: 'allItemsQuery' }) 
+) (Queue)
+
